@@ -9,4 +9,13 @@ export default defineConfig({
     ["junit", { outputFile: "test-results/results.xml" }],
     ["html", { outputFolder: "playwright-report" }],
   ],
+  projects: [
+    {
+      name: 'brave',
+      use: {
+        ...devices['Desktop Chrome'],
+        executablePath: 'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
+      },
+    },
+  ],
 });
