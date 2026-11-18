@@ -1,4 +1,4 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: ".",
@@ -16,5 +16,14 @@ export default defineConfig({
     ["list"],
     ["junit", { outputFile: "test-results/results.xml" }],
     ["html", { outputFolder: "playwright-report" }],
-  ]
+  ],
+  projects: [
+    {
+      name: 'brave',
+      use: {
+        ...devices['Desktop Chrome'],
+        executablePath: 'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
+      },
+    },
+  ],
 });
