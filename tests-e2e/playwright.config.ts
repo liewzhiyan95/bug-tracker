@@ -10,6 +10,8 @@ export default defineConfig({
     launchOptions: {
       slowMo: process.env.CI ? 0 : 1000,
     },
+    ...devices['Desktop Chrome'], 
+    executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
   },
   timeout: 30000,
   reporter: [
