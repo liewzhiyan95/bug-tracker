@@ -146,15 +146,6 @@ jobs:
           CI: "1"
           PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: ubuntu24.04-x64
         run: |
-          if [ -f ./bugtracker-frontend/package-lock.json ]; then
-            npm ci --prefix ./bugtracker-frontend
-          else
-            npm install --prefix ./bugtracker-frontend
-          fi
-
-          npm run build --prefix ./bugtracker-frontend
-          npm run start --prefix ./bugtracker-frontend -- -p 3000 &
-
           if [ -f ./tests-e2e/package-lock.json ]; then
             npm ci --prefix ./tests-e2e
           else
