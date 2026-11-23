@@ -120,7 +120,7 @@ jobs:
             ``` 
   api-e2e-perf-tests:
     needs: [unit-tests-backend, unit-tests-frontend]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
@@ -144,6 +144,7 @@ jobs:
         working-directory: ./tests-e2e
         env:
           CI: "1"
+          PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: ubuntu24.04-x64
         run: |
           npm ci
           npx playwright install
