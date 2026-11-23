@@ -146,10 +146,14 @@ jobs:
           CI: "1"
           PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: ubuntu24.04-x64
         run: |
-          npm ci
-          npx playwright install --with-deps
-          npx wait-port localhost:3000 -t 30000
-          npx playwright test  
+          npm ci --prefix ./bugtracker-frontend
+          npm run build --prefix ./bugtracker-frontend
+          npm run start --prefix ./bugtracker-frontend -- -p 3000 &
+
+          npm ci --prefix ./tests-e2e
+          npx --prefix ./tests-e2e playwright install --with-deps
+          npx wait-port localhost:3000 -t 60000
+          npx --prefix ./tests-e2e playwright test
       
       - name: Setup K6
         uses: grafana/setup-k6-action@v1
