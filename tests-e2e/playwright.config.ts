@@ -16,8 +16,8 @@ export default defineConfig({
   timeout: 30000,
   reporter: [
     ["list"],
+    ['html', { open: 'never' }],
     ["junit", { outputFile: "test-results/results.xml" }],
-    ["html", { outputFolder: "playwright-report" }],
   ],
   projects: [
     {
