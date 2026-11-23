@@ -147,7 +147,8 @@ jobs:
           PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: ubuntu24.04-x64
         run: |
           npm ci
-          npx playwright install
+          npx playwright install --with-deps
+          npx wait-port localhost:3000 -t 30000
           npx playwright test  
       
       - name: Setup K6
@@ -214,9 +215,7 @@ jobs:
         with:
           name: performance-raw-results
           path: summary.json
-          retention-days: 30  
-       
-      
+          retention-days: 30   
 
       - name: Publish API Test Results
         uses: dorny/test-reporter@v1
