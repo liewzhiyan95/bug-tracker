@@ -139,6 +139,15 @@ jobs:
       
       - name: Shut Down Application
         run: docker compose down    
+
+      - name: Run E2E Tests
+        working-directory: ./tests-e2e
+        env:
+          CI: "1"
+        run: |
+          npm ci
+          npx playwright install
+          npx playwright test  
       
       - name: Upload API Test Results
         if: always()
