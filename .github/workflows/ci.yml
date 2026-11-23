@@ -146,11 +146,21 @@ jobs:
           CI: "1"
           PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: ubuntu24.04-x64
         run: |
-          npm ci --prefix ./bugtracker-frontend
+          if [ -f ./bugtracker-frontend/package-lock.json ]; then
+            npm ci --prefix ./bugtracker-frontend
+          else
+            npm install --prefix ./bugtracker-frontend
+          fi
+
           npm run build --prefix ./bugtracker-frontend
           npm run start --prefix ./bugtracker-frontend -- -p 3000 &
 
-          npm ci --prefix ./tests-e2e
+          if [ -f ./tests-e2e/package-lock.json ]; then
+            npm ci --prefix ./tests-e2e
+          else
+            npm install --prefix ./tests-e2e
+          fi
+
           npx --prefix ./tests-e2e playwright install --with-deps
           npx wait-port localhost:3000 -t 60000
           npx --prefix ./tests-e2e playwright test
