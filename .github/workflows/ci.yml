@@ -141,11 +141,22 @@ jobs:
         run: docker compose down    
 
       - name: Run E2E Tests
-        working-directory: ./tests-e2e
+        # working-directory: ./tests-e2e
         env:
           CI: "1"
           PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: ubuntu24.04-x64
         run: |
+          cd "$GITHUB_WORKSPACE"
+
+          if [ -f ./bugtracker-frontend/package-lock.json ]; then
+            npm ci --prefix ./bugtracker-frontend
+          else
+            npm install --prefix ./bugtracker-frontend
+          fi
+
+          npm run build --prefix ./bugtracker-frontend
+          (cd ./bugtracker-frontend && npm run start -- -p 3000) &
+
           if [ -f ./tests-e2e/package-lock.json ]; then
             npm ci --prefix ./tests-e2e
           else
