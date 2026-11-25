@@ -140,32 +140,32 @@ jobs:
       - name: Shut Down Application
         run: docker compose down    
 
-      - name: Run E2E Tests
-        # working-directory: ./tests-e2e
-        env:
-          CI: "1"
-          PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: ubuntu24.04-x64
-        run: |
-          cd "$GITHUB_WORKSPACE"
+      # - name: Run E2E Tests
+      #   # working-directory: ./tests-e2e
+      #   env:
+      #     CI: "1"
+      #     PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: ubuntu24.04-x64
+      #   run: |
+      #     cd "$GITHUB_WORKSPACE"
 
-          if [ -f ./bugtracker-frontend/package-lock.json ]; then
-            npm ci --prefix ./bugtracker-frontend
-          else
-            npm install --prefix ./bugtracker-frontend
-          fi
+      #     if [ -f ./bugtracker-frontend/package-lock.json ]; then
+      #       npm ci --prefix ./bugtracker-frontend
+      #     else
+      #       npm install --prefix ./bugtracker-frontend
+      #     fi
 
-          npm run build --prefix ./bugtracker-frontend
-          (cd ./bugtracker-frontend && npm run start -- -p 3000) &
+      #     npm run build --prefix ./bugtracker-frontend
+      #     (cd ./bugtracker-frontend && npm run start -- -p 3000) &
 
-          if [ -f ./tests-e2e/package-lock.json ]; then
-            npm ci --prefix ./tests-e2e
-          else
-            npm install --prefix ./tests-e2e
-          fi
+      #     if [ -f ./tests-e2e/package-lock.json ]; then
+      #       npm ci --prefix ./tests-e2e
+      #     else
+      #       npm install --prefix ./tests-e2e
+      #     fi
 
-          npx --prefix ./tests-e2e playwright install --with-deps
-          npx wait-port localhost:3000 -t 60000
-          npx --prefix ./tests-e2e playwright test
+      #     npx --prefix ./tests-e2e playwright install --with-deps
+      #     npx wait-port localhost:3000 -t 60000
+      #     npx --prefix ./tests-e2e playwright test
       
       - name: Setup K6
         uses: grafana/setup-k6-action@v1
@@ -266,9 +266,45 @@ jobs:
         working-directory: ./bugtracker-backend
         run: flyctl deploy -c fly.staging.toml --remote-only
 
-      - name: Deploy Backend
+      - name: Deploy Frontend
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         working-directory: ./bugtracker-frontend
         run: flyctl deploy -c fly.staging.toml --remote-only
   
+  post-deployment-tests:
+    needs: deploy-staging
+    # if: github.ref == 'refs/head/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Playwright
+        working-directory: ./tests-e2e
+        run: |
+          npm ci
+          npx playwright install
+
+      - name: Run Post Deployment Tests
+        working-directory: ./tests-e2e
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: "https://bugtracker-backend-radiant-lzy95-3887.fly.dev/" 
+        run: |
+          npx playwright test      
+      
+      - name: Upload Post Deployment Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-deployment-test-playwright-report
+          path: ./tests-e2e/playwright-report
+          retention-days: 30
+
+      - name: Publish Post Deployment Test Results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Post Deployment Tests Report
+          path: ./tests-e2e/test-results/results.xml
+          reporter: jest-junit    
