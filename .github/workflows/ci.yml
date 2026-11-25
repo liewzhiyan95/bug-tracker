@@ -4,41 +4,46 @@ permissions:
   contents: read
   checks: write
 
-on:  
-  push: 
+on:
+  push:
     branches:
-      - main 
+      - main
   workflow_dispatch:
+    inputs:
+      run_playwright:
+        description: "Run Playwright API, E2E, and post-deployment tests"
+        type: boolean
+        default: false
 
 jobs:
   unit-tests-backend:
     runs-on: ubuntu-latest
     outputs:
       coverage: ${{ steps.test-backend.outputs.report }}
-    steps: 
+    steps:
       - uses: actions/checkout@v4
 
       - name: Set up go
         uses: actions/setup-go@v4
-        with: 
+        with:
           go-version: "1.27.4"
           cache-dependency-path: bugtracker-backend/go.sum
-      
+
       - name: Add Go bin to PATH
         run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Install go-junit-report
         run: go install github.com/jstemmer/go-junit-report/v2@latest
 
-      - name: Execute Backend Unit Tests 
+      - name: Execute Backend Unit Tests
         id: test-backend
-        working-directory: ./bugtracker-backend 
+        working-directory: ./bugtracker-backend
         run: |
           go test -json -coverprofile=coverage.out -covermode=atomic ./...
           go tool cover -func=coverage.out > coverage.txt
           echo "## Go Test Coverage Report" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          cat coverage.txt >> $GITHUB_STEP_SUMMARY 
+          cat coverage.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
           echo "report<<EOF" >> $GITHUB_OUTPUT
@@ -46,7 +51,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
           go test -v ./... 2>&1 | go-junit-report > test-results.xml
-      
+
       - name: Publish Backend Test Results
         uses: dorny/test-reporter@v1
         if: always()
@@ -62,23 +67,23 @@ jobs:
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
-        with: 
+        with:
           node-version: "24"
           cache: "npm"
-          cache-dependency-path: bugtracker-frontend/package-lock.json 
+          cache-dependency-path: bugtracker-frontend/package-lock.json
 
       - name: Execute Frontend Unit Tests
         id: test-frontend
         working-directory: ./bugtracker-frontend
         run: |
           npm ci
-          npm test 2>&1 | tee full_output.txt 
+          npm test 2>&1 | tee full_output.txt
 
           echo "## Frontend Test Coverage Report" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          cat full_output.txt >> $GITHUB_STEP_SUMMARY 
+          cat full_output.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          
+
           echo "report<<EOF" >> $GITHUB_OUTPUT
           cat full_output.txt >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -97,7 +102,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       coverage: ${{ steps.test-frontend.outputs.report }}
-    permissions: 
+    permissions:
       pull-requests: write
     steps:
       - name: Create Backend Coverage Comment
@@ -108,7 +113,7 @@ jobs:
             ## Backend Test Coverage Report
             ```
             ${{ needs.unit-tests-backend.outputs.coverage }}
-            ``` 
+            ```
       - name: Create Frontend Coverage Comment
         uses: peter-evans/create-or-update-comment@v4
         with:
@@ -117,11 +122,11 @@ jobs:
             ## Frontend Test Coverage Report
             ```
             ${{ needs.unit-tests-frontend.outputs.coverage }}
-            ``` 
+            ```
+
   api-e2e-perf-tests:
     needs: [unit-tests-backend, unit-tests-frontend]
     runs-on: ubuntu-24.04
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -132,41 +137,43 @@ jobs:
           npx wait-port http://localhost:8080/api/health -t 30000
 
       - name: Run API Tests
+        if: inputs.run_playwright == true
         working-directory: ./tests-api
         run: |
           npm ci
           npx playwright test
-      
+
       - name: Shut Down Application
-        run: docker compose down    
+        if: always()
+        run: docker compose down
 
-      # - name: Run E2E Tests
-      #   # working-directory: ./tests-e2e
-      #   env:
-      #     CI: "1"
-      #     PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: ubuntu24.04-x64
-      #   run: |
-      #     cd "$GITHUB_WORKSPACE"
+      - name: Run E2E Tests
+        if: inputs.run_playwright == true
+        env:
+          CI: "1"
+          PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: ubuntu24.04-x64
+        run: |
+          cd "$GITHUB_WORKSPACE"
 
-      #     if [ -f ./bugtracker-frontend/package-lock.json ]; then
-      #       npm ci --prefix ./bugtracker-frontend
-      #     else
-      #       npm install --prefix ./bugtracker-frontend
-      #     fi
+          if [ -f ./bugtracker-frontend/package-lock.json ]; then
+            npm ci --prefix ./bugtracker-frontend
+          else
+            npm install --prefix ./bugtracker-frontend
+          fi
 
-      #     npm run build --prefix ./bugtracker-frontend
-      #     (cd ./bugtracker-frontend && npm run start -- -p 3000) &
+          npm run build --prefix ./bugtracker-frontend
+          (cd ./bugtracker-frontend && npm run start -- -p 3000) &
 
-      #     if [ -f ./tests-e2e/package-lock.json ]; then
-      #       npm ci --prefix ./tests-e2e
-      #     else
-      #       npm install --prefix ./tests-e2e
-      #     fi
+          if [ -f ./tests-e2e/package-lock.json ]; then
+            npm ci --prefix ./tests-e2e
+          else
+            npm install --prefix ./tests-e2e
+          fi
 
-      #     npx --prefix ./tests-e2e playwright install --with-deps
-      #     npx wait-port localhost:3000 -t 60000
-      #     npx --prefix ./tests-e2e playwright test
-      
+          npx --prefix ./tests-e2e playwright install --with-deps
+          npx wait-port localhost:3000 -t 60000
+          npx --prefix ./tests-e2e playwright test
+
       - name: Setup K6
         uses: grafana/setup-k6-action@v1
 
@@ -176,38 +183,37 @@ jobs:
           path: tests-perf/script.js
           flags: --out json=summary.json
 
-
       - name: Upload API Test Results
-        if: always()
+        if: always() && inputs.run_playwright == true
         uses: actions/upload-artifact@v4
         with:
           name: api-test-results
           path: ./tests-api/test-results/
           retention-days: 30
-      
+
       - name: Upload API Test Playwright Report
-        if: always()
+        if: always() && inputs.run_playwright == true
         uses: actions/upload-artifact@v4
         with:
           name: api-test-playwright-report
           path: ./tests-api/playwright-report
-          retention-days: 30    
-      
+          retention-days: 30
+
       - name: Upload E2E Test Results
-        if: always()
+        if: always() && inputs.run_playwright == true
         uses: actions/upload-artifact@v4
         with:
           name: e2e-test-results
           path: ./tests-e2e/test-results
-          retention-days: 30    
-      
+          retention-days: 30
+
       - name: Upload E2E Test Playwright Report
-        if: always()
+        if: always() && inputs.run_playwright == true
         uses: actions/upload-artifact@v4
         with:
           name: e2e-test-playwright-report
           path: ./tests-e2e/playwright-report
-          retention-days: 30        
+          retention-days: 30
 
       - name: Upload Performance Raw Results
         if: always()
@@ -223,37 +229,28 @@ jobs:
         with:
           name: performance-report
           path: perf-results.html
-          retention-days: 30    
-      
-      - name: Upload Performance Raw Report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: performance-raw-results
-          path: summary.json
-          retention-days: 30   
+          retention-days: 30
 
       - name: Publish API Test Results
         uses: dorny/test-reporter@v1
-        if: always()
+        if: always() && inputs.run_playwright == true
         with:
           name: API Tests Report
           path: ./tests-api/test-results/*.xml
           reporter: jest-junit
-        
+
       - name: Publish E2E Test Results
         uses: dorny/test-reporter@v1
-        if: always() && hashFiles('tests-e2e/test-results/results.xml') != ''
+        if: always() && inputs.run_playwright == true && hashFiles('tests-e2e/test-results/results.xml') != ''
         with:
           name: E2E Tests Report
           path: ./tests-e2e/test-results/results.xml
-          reporter: jest-junit    
-      
+          reporter: jest-junit
+
   deploy-staging:
     needs: [api-e2e-perf-tests]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -271,12 +268,11 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         working-directory: ./bugtracker-frontend
         run: flyctl deploy -c fly.staging.toml --remote-only
-  
+
   post-deployment-tests:
     needs: deploy-staging
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && inputs.run_playwright == true
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -289,10 +285,10 @@ jobs:
       - name: Run Post Deployment Tests
         working-directory: ./tests-e2e
         env:
-          PLAYWRIGHT_TEST_BASE_URL: "https://bugtracker-backend-radiant-lzy95-3887.fly.dev/" 
+          PLAYWRIGHT_TEST_BASE_URL: "https://bugtracker-backend-radiant-lzy95-3887.fly.dev/"
         run: |
-          npx playwright test      
-      
+          npx playwright test
+
       - name: Upload Post Deployment Test Report
         if: always()
         uses: actions/upload-artifact@v4
@@ -307,13 +303,16 @@ jobs:
         with:
           name: Post Deployment Tests Report
           path: ./tests-e2e/test-results/results.xml
-          reporter: jest-junit    
-  
-  deploy-production:
-    needs: [post-deployment-tests]
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+          reporter: jest-junit
 
+  deploy-production:
+    needs: [deploy-staging, post-deployment-tests]
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      needs.deploy-staging.result == 'success' &&
+      (needs.post-deployment-tests.result == 'success' || needs.post-deployment-tests.result == 'skipped')
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -330,4 +329,4 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         working-directory: ./bugtracker-frontend
-        run: flyctl deploy -c fly.toml --remote-only        
+        run: flyctl deploy -c fly.toml --remote-only
