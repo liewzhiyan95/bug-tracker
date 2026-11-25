@@ -1,22 +1,18 @@
-# fly.toml app configuration file generated for bugtracker-backend-radiant-lzy95-3887 on 2026-11-24T08:30:02+08:00
+# fly.toml app configuration file generated for bugtracker-backend-prod-lzy95 on 2026-11-25T11:13:46+08:00
 #
 # See https://docs.fly.io/reference/configuration for information about how to use this file.
 #
 
-app = 'bugtracker-backend-radiant-lzy95-3887'
+app = 'bugtracker-backend-prod-lzy95'
 primary_region = 'sin'
 
 [build]
-
-[mounts]
-  source="bugtracker_data"
-  destination="/data"
-
 [env]
-  DB_PATH = "/data/bugs.db"
+  DB_PATH = '/data/bugs.db'
 
-[build.args]
-  NEXT_PUBLIC_API_URL = "https://bugtracker-backend-radiant-lzy95-3887.fly.dev/"
+[[mounts]]
+  source = 'bugtracker_data'
+  destination = '/data'
 
 [http_service]
   internal_port = 8080
