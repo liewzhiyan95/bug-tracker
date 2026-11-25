@@ -143,10 +143,6 @@ jobs:
           npm ci
           npx playwright test
 
-      - name: Shut Down Application
-        if: always()
-        run: docker compose down
-
       - name: Run E2E Tests
         if: inputs.run_playwright == true
         env:
@@ -183,6 +179,10 @@ jobs:
           path: tests-perf/script.js
           flags: --out json=summary.json
 
+      - name: Shut Down Application
+        if: always()
+        run: docker compose down
+        
       - name: Upload API Test Results
         if: always() && inputs.run_playwright == true
         uses: actions/upload-artifact@v4
